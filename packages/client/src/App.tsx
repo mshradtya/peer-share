@@ -1,7 +1,8 @@
 import "./App.css";
+import Routes from "./router";
 
 function App() {
-  return <div className="text-2xl">hello world</div>;
+  return <Routes />;
 }
 
 export default App;
