@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import RootLayout from "@/components/layouts/RootLayout";
 import HomePage from "@/pages/HomePage";
+import SharePage from "@/pages/SharePage";
 
 const router = createBrowserRouter([
   {
@@ -9,6 +10,7 @@ const router = createBrowserRouter([
     children: [
       // public routes
       { path: "", element: <HomePage /> },
+      { path: "/share", element: <SharePage /> },
     ],
   },
 ]);
