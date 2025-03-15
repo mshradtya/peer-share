@@ -7,13 +7,55 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy } from "lucide-react";
+import { Copy, Check, PlusIcon } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+let peerConnection: RTCPeerConnection;
+let dataChannel: RTCDataChannel;
+
+const iconsMap = {
+  copy: <Copy />,
+  copied: <Check />,
+  add: <PlusIcon />,
+};
 
 const SharePage: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
+  const [copyIcon, setCopyIcon] = useState(iconsMap["copy"]);
+  const [localSDP, setLocalSDP] = useState<string>("");
+  const [remoteSDP, setRemoteSDP] = useState<string>("");
+
+  const createConnection = async () => {
+    try {
+      peerConnection = new RTCPeerConnection({ iceServers });
+      dataChannel = peerConnection.createDataChannel("fileTransfer");
+
+      peerConnection.addEventListener("icecandidate", (event) => {
+        if (event.candidate === null) {
+          let withCandidates = JSON.stringify(peerConnection.localDescription);
+          setLocalSDP(withCandidates);
+        }
+      });
+
+      let offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const copyLocalSDP = async () => {
+    try {
+      await navigator.clipboard.writeText(localSDP);
+      setCopyIcon(iconsMap["copied"]);
+      setTimeout(() => setCopyIcon(iconsMap["copy"]), 2000);
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
   return (
     <div className="max-w-2/3 mx-auto">
@@ -37,16 +79,19 @@ const SharePage: React.FC = () => {
             <CardDescription>Your connection Info</CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea
-              readOnly
-              placeholder="Your connection data will appear here"
-              className="min-h-32"
-            />
+            <ScrollArea className="h-32 rounded-md border p-4">
+              {localSDP}
+            </ScrollArea>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button>Create Connection</Button>
-            <Button variant="outline" size="icon">
-              <Copy />
+            <Button onClick={createConnection}>Create Connection</Button>
+            <Button
+              disabled={!localSDP}
+              variant="outline"
+              size="icon"
+              onClick={copyLocalSDP}
+            >
+              {copyIcon}
             </Button>
           </CardFooter>
         </Card>
@@ -56,17 +101,20 @@ const SharePage: React.FC = () => {
             <CardDescription>Paste your peer's connection info</CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea
-              readOnly
-              placeholder="Paste your peer's connection data here"
-              className="min-h-32"
-            />
+            <ScrollArea className="h-32 rounded-md border p-4">
+              {remoteSDP}
+            </ScrollArea>
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button>Connect</Button>
-            <Button variant="outline" size="icon">
-              <Copy />
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon">
+                {iconsMap["add"]}
+              </Button>
+              <Button variant="outline" size="icon">
+                <Copy />
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </div>
