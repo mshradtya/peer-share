@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ModeToggle } from "../mode-toggle";
 
 const Navbar: React.FC = () => {
   return (
@@ -13,6 +14,9 @@ const Navbar: React.FC = () => {
         </Link>
         <nav>
           <ul className="flex items-center gap-6">
+            <li>
+              <ModeToggle />
+            </li>
             <li>
               <Link to="/" className="hover:text-primary transition-colors">
                 Home

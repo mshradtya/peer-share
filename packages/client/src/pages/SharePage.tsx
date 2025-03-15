@@ -57,6 +57,7 @@ const SharePage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <Textarea
+              readOnly
               placeholder="Paste your peer's connection data here"
               className="min-h-32"
             />
