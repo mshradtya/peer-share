@@ -12,10 +12,28 @@ import { Input } from "@/components/ui/input";
 import { Copy, Check, PlusIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+
+interface Chunk {
+  data: ArrayBuffer;
+  index: number;
+}
 
 const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
 let peerConnection: RTCPeerConnection;
 let dataChannel: RTCDataChannel;
+
+// file transfer related variables
+let fileReader: FileReader;
+
+// flow control variables
+let fileSendQueue: Chunk[] = [];
+
+// chunk size for file transfer (32 KB)
+const CHUNK_SIZE = 32 * 1024;
+
+// transfer speed control (ms between chunks)
+let chunkDelay = 5;
 
 const iconsMap = {
   copy: <Copy />,
@@ -31,6 +49,9 @@ const SharePage: React.FC = () => {
   const [addingRemoteSDP, setAddingRemoteSDP] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [transferStatus, setTransferStatus] = useState("");
 
   const createConnection = async () => {
     try {
@@ -126,6 +147,102 @@ const SharePage: React.FC = () => {
     if (!dataChannel || dataChannel.readyState !== "open") {
       return;
     }
+
+    // resetting
+    fileSendQueue = [];
+
+    // send file meta data first
+    const metadata = {
+      type: "file-info",
+      name: file.name,
+      size: file.size,
+      mimeType: file.type,
+    };
+
+    dataChannel.send(JSON.stringify(metadata));
+    setShowProgress(true);
+    prepareFileChunks();
+  };
+
+  const prepareFileChunks = () => {
+    if (!file) return;
+
+    fileReader = new FileReader();
+    let offset = 0;
+    let chunkIndex = 0;
+
+    const readSlice = async (o: number) => {
+      let slice = file.slice(o, o + CHUNK_SIZE);
+      fileReader.readAsArrayBuffer(slice);
+    };
+
+    const loadChunkToQueue = () => {
+      let chunk = fileReader.result as ArrayBuffer;
+
+      fileSendQueue.push({
+        data: chunk,
+        index: chunkIndex,
+      });
+
+      offset += chunk.byteLength;
+      chunkIndex++;
+
+      // update preparation progress
+      const percentage = Math.floor((offset / file.size) * 100);
+      setProgress(percentage);
+      setTransferStatus(`Preparing file for Transfer... ${percentage}%`);
+
+      if (offset < file.size) {
+        readSlice(offset);
+      } else {
+        processSendQueue();
+      }
+    };
+
+    fileReader.addEventListener("load", () => loadChunkToQueue());
+    fileReader.addEventListener("error", () => console.log(fileReader.error));
+
+    readSlice(offset);
+  };
+
+  const processSendQueue = () => {
+    if (fileSendQueue.length === 0) return;
+    if (!file) return;
+
+    const chunk = fileSendQueue.shift() as Chunk;
+
+    try {
+      dataChannel.send(chunk.data);
+
+      const sentBytes = chunk.index * CHUNK_SIZE;
+      const percentage = Math.floor((sentBytes / file.size) * 100);
+
+      setProgress(percentage);
+      setTransferStatus(`Sending File... ${percentage}%`);
+
+      // if more chunks to send
+      if (fileSendQueue.length > 0) {
+        setTimeout(processSendQueue, chunkDelay);
+      } else {
+        // if this was the last chunk
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+        if (chunk.index >= totalChunks - 1) {
+          // transfer complete
+          setProgress(100);
+          setTransferStatus(`Sending File... 100%`);
+
+          setTimeout(() => setShowProgress(false), 2000);
+        } else {
+          // something went wrong, queue didn't contain all chunks
+          console.log(
+            "warning: not all chunks were processed. transfer may be incomplete"
+          );
+        }
+      }
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   return (
@@ -201,6 +318,7 @@ const SharePage: React.FC = () => {
           </CardFooter>
         </Card>
       </div>
+
       {/* select file to transfer */}
       <Card className="mt-3.5">
         <CardHeader>
@@ -214,6 +332,14 @@ const SharePage: React.FC = () => {
           </Button>
         </CardContent>
       </Card>
+
+      {/* progress bar */}
+      {showProgress && (
+        <div className="flex flex-col items-center">
+          <Progress value={progress} className="w-full my-4" />
+          <p>{transferStatus}</p>
+        </div>
+      )}
     </div>
   );
 };
