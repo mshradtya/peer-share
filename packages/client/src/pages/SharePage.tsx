@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, PlusIcon } from "lucide-react";
+import { Copy, Check, PlusIcon, Download } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +25,15 @@ let dataChannel: RTCDataChannel;
 
 // file transfer related variables
 let fileReader: FileReader;
+
+let currentFileSize = 0;
+let currentFileMetadata: {
+  name: string;
+  type: string;
+} = { name: "", type: "" };
+
+let receivedSize = 0;
+let receivedData: ArrayBuffer[] = [];
 
 // flow control variables
 let fileSendQueue: Chunk[] = [];
@@ -52,6 +61,7 @@ const SharePage: React.FC = () => {
   const [showProgress, setShowProgress] = useState(false);
   const [progress, setProgress] = useState(0);
   const [transferStatus, setTransferStatus] = useState("");
+  const [receivedFileUrl, setReceivedFileUrl] = useState<string | null>(null);
 
   const createConnection = async () => {
     try {
@@ -118,7 +128,47 @@ const SharePage: React.FC = () => {
     dataChannel.addEventListener("close", () => {
       setIsConnected(false);
     });
-    dataChannel.addEventListener("message", () => {});
+    dataChannel.addEventListener("message", (event) => {
+      let data = event.data;
+
+      // file meta data received - save and enable progress bar
+      if (typeof data === "string") {
+        const metadata = JSON.parse(data);
+
+        if (metadata.type === "file-info") {
+          // reset for new file
+          receivedSize = 0;
+          receivedData = [];
+          currentFileSize = metadata.size;
+
+          // store original filename and mimetype
+          currentFileMetadata = {
+            name: metadata.name,
+            type: metadata.mimeType || "application/octet-stream",
+          };
+
+          // enable progress bar
+          setShowProgress(true);
+        }
+      } else {
+        receivedData.push(data);
+        receivedSize += data.byteLength;
+
+        const percentage = Math.floor((receivedSize / currentFileSize) * 100);
+        setProgress(percentage);
+        setTransferStatus(`Receiving file... ${percentage}%`);
+
+        if (receivedSize === currentFileSize) {
+          const receivedFile = new Blob(receivedData, {
+            type: currentFileMetadata.type,
+          });
+
+          const fileUrl = URL.createObjectURL(receivedFile);
+          setReceivedFileUrl(fileUrl);
+          setTimeout(() => setShowProgress(false), 2000);
+        }
+      }
+    });
   };
 
   const copyLocalSDP = async () => {
@@ -245,6 +295,17 @@ const SharePage: React.FC = () => {
     }
   };
 
+  const handleDownload = () => {
+    if (!receivedFileUrl || !currentFileMetadata) return;
+
+    const downloadLink = document.createElement("a");
+    downloadLink.href = receivedFileUrl;
+    downloadLink.download = currentFileMetadata.name;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
+
   return (
     <div className="max-w-2/3 mx-auto">
       {/* connection status */}
@@ -338,6 +399,15 @@ const SharePage: React.FC = () => {
         <div className="flex flex-col items-center">
           <Progress value={progress} className="w-full my-4" />
           <p>{transferStatus}</p>
+        </div>
+      )}
+
+      {receivedFileUrl && (
+        <div className="mt-4 flex justify-center">
+          <Button onClick={handleDownload}>
+            <Download className="mr-2 h-4 w-4" />
+            Download {currentFileMetadata?.name}
+          </Button>
         </div>
       )}
     </div>
