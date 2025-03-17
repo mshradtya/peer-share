@@ -3,18 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 
 const DownloadFile: React.FC = () => {
-  const { receivedFileUrl, currentFileMetadata } = useWebRTC();
-
-  const handleDownload = () => {
-    if (!receivedFileUrl || !currentFileMetadata) return;
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = receivedFileUrl;
-    downloadLink.download = currentFileMetadata.name;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-  };
+  const { receivedFileUrl, currentFileMetadata, handleDownload } = useWebRTC();
 
   return (
     <>
