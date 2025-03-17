@@ -14,6 +14,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 
+import { useWebRTC } from "@/context/WebRTCProvider";
+
+import ConnectionStatus from "@/components/ConnectionStatus";
+
 interface Chunk {
   data: ArrayBuffer;
   index: number;
@@ -51,7 +55,8 @@ const iconsMap = {
 };
 
 const SharePage: React.FC = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const { isConnected, setIsConnected } = useWebRTC();
+
   const [copyIcon, setCopyIcon] = useState(iconsMap["copy"]);
   const [localSDP, setLocalSDP] = useState("");
   const [remoteSDP, setRemoteSDP] = useState("");
@@ -309,17 +314,7 @@ const SharePage: React.FC = () => {
   return (
     <div className="max-w-2/3 mx-auto">
       {/* connection status */}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Connect and Share</h1>
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          ></div>
-          <span>{isConnected ? "Connected" : "Disconnected"}</span>
-        </div>
-      </div>
+      <ConnectionStatus />
 
       <div className="flex gap-3.5 mt-2">
         {/* local sdp generation  */}
