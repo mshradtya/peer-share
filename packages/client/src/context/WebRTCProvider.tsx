@@ -40,6 +40,10 @@ interface FileMetaData {
 export const WebRTCProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
+  const [peerConnection, setPeerConnection] =
+    useState<RTCPeerConnection | null>(null);
+  const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
+
   const [isConnected, setIsConnected] = useState(false);
   const [copyIcon, setCopyIcon] = useState(<Copy />);
   const [localSDP, setLocalSDP] = useState("");
@@ -58,8 +62,6 @@ export const WebRTCProvider: React.FC<{ children: ReactNode }> = ({
   const [file, setFile] = useState<File | null>(null);
 
   const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
-  let peerConnection: RTCPeerConnection;
-  let dataChannel: RTCDataChannel;
 
   let currentFileSize = 0;
 
@@ -80,19 +82,22 @@ export const WebRTCProvider: React.FC<{ children: ReactNode }> = ({
 
   const createConnection = async () => {
     try {
-      peerConnection = new RTCPeerConnection({ iceServers });
-      dataChannel = peerConnection.createDataChannel("fileTransfer");
-      setupDataChannel();
+      const pc = new RTCPeerConnection({ iceServers });
+      const dc = pc.createDataChannel("fileTransfer");
 
-      peerConnection.addEventListener("icecandidate", (event) => {
+      setPeerConnection(pc);
+      setDataChannel(dc);
+      setupDataChannel(dc);
+
+      pc.addEventListener("icecandidate", (event) => {
         if (event.candidate === null) {
-          let withCandidates = JSON.stringify(peerConnection.localDescription);
+          let withCandidates = JSON.stringify(pc.localDescription);
           setLocalSDP(withCandidates);
         }
       });
 
-      let offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
+      let offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
     } catch (err) {
       console.log(err);
     }
@@ -101,40 +106,49 @@ export const WebRTCProvider: React.FC<{ children: ReactNode }> = ({
   const connectToPeer = async () => {
     try {
       let remoteSdp = JSON.parse(remoteSDP);
+      let pc: RTCPeerConnection;
 
       if (!peerConnection) {
-        peerConnection = new RTCPeerConnection({
+        pc = new RTCPeerConnection({
           iceServers,
         });
 
-        peerConnection.addEventListener("datachannel", (event) => {
-          dataChannel = event.channel;
-          setupDataChannel();
+        setPeerConnection(pc);
+
+        pc.addEventListener("datachannel", (event) => {
+          const dc = event.channel;
+          setDataChannel(dc);
+          setupDataChannel(dc);
         });
 
-        peerConnection.addEventListener("icecandidate", (event) => {
+        pc.addEventListener("icecandidate", (event) => {
           if (event.candidate === null) {
-            let withCandidates = JSON.stringify(
-              peerConnection.localDescription
-            );
+            let withCandidates = JSON.stringify(pc.localDescription);
             setLocalSDP(withCandidates);
           }
         });
-      }
 
-      await peerConnection.setRemoteDescription(remoteSdp);
-      setAddingRemoteSDP(false);
+        await pc.setRemoteDescription(remoteSdp);
 
-      if (remoteSdp.type === "offer") {
-        let answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
+        if (remoteSdp.type === "offer") {
+          let answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+        }
+      } else {
+        await peerConnection.setRemoteDescription(remoteSdp);
+        setAddingRemoteSDP(false);
+
+        if (remoteSdp.type === "offer") {
+          let answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+        }
       }
     } catch (err) {
       console.log(err);
     }
   };
 
-  const setupDataChannel = () => {
+  const setupDataChannel = (dataChannel: RTCDataChannel) => {
     if (!dataChannel) return;
 
     dataChannel.addEventListener("open", () => {
@@ -254,6 +268,7 @@ export const WebRTCProvider: React.FC<{ children: ReactNode }> = ({
 
   const processSendQueue = () => {
     if (fileSendQueue.length === 0) return;
+    if (!dataChannel) return;
     if (!file) return;
 
     const chunk = fileSendQueue.shift() as Chunk;
