@@ -27,7 +27,7 @@ const FileTransfer: React.FC = () => {
         <CardTitle>File Transfer</CardTitle>
         <CardDescription>Choose a file to transfer</CardDescription>
       </CardHeader>
-      <CardContent className="flex gap-2">
+      <CardContent className="flex flex-col md:flex-row gap-2">
         <Input type="file" onChange={handleFileChange} />
         <Button disabled={!isConnected} onClick={startSendingFile}>
           Send

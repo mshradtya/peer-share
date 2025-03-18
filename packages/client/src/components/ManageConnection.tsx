@@ -27,20 +27,22 @@ const ManageConnection: React.FC = () => {
   } = useWebRTC();
 
   return (
-    <div className="flex gap-3.5 mt-2">
-      {/* local sdp generation  */}
-      <Card className="w-[50%]">
+    <div className="flex flex-col md:flex-row md:gap-3.5 mt-2 w-full">
+      {/* local sdp generation */}
+      <Card className="w-full md:w-1/2">
         <CardHeader>
-          <CardTitle>Connection Setup</CardTitle>
-          <CardDescription>Your connection Info</CardDescription>
+          <CardTitle className="text-lg md:text-xl">Connection Setup</CardTitle>
+          <CardDescription>Your connection info</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-32 rounded-md border p-4">
+          <ScrollArea className="h-28 md:h-32 rounded-md border p-2 md:p-4">
             {localSDP}
           </ScrollArea>
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button onClick={createConnection}>Create Connection</Button>
+          <Button onClick={createConnection} className="text-sm md:text-base">
+            Create
+          </Button>
           <Button
             disabled={!localSDP}
             variant="outline"
@@ -51,10 +53,11 @@ const ManageConnection: React.FC = () => {
           </Button>
         </CardFooter>
       </Card>
+
       {/* remote sdp registration */}
-      <Card className="w-[50%]">
+      <Card className="w-full md:w-1/2 mt-3.5 md:mt-0">
         <CardHeader>
-          <CardTitle>Connect To Peer</CardTitle>
+          <CardTitle className="text-lg md:text-xl">Connect To Peer</CardTitle>
           <CardDescription>Paste your peer's connection info</CardDescription>
         </CardHeader>
         <CardContent>
@@ -63,16 +66,18 @@ const ManageConnection: React.FC = () => {
               value={remoteSDP}
               onChange={(event) => setRemoteSDP(event.target.value)}
               placeholder="Paste the connection string here"
-              className="h-32 rounded-md border"
+              className="h-28 md:h-32 rounded-md border"
             />
           ) : (
-            <ScrollArea className="h-32 rounded-md border p-4">
+            <ScrollArea className="h-28 md:h-32 rounded-md border p-2 md:p-4">
               {remoteSDP}
             </ScrollArea>
           )}
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button onClick={connectToPeer}>Connect</Button>
+          <Button onClick={connectToPeer} className="text-sm md:text-base">
+            Connect
+          </Button>
           <div className="flex gap-2">
             <Button
               variant="outline"
