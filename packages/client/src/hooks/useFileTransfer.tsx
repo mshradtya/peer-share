@@ -50,7 +50,7 @@ export const useFileTransfer = (
   useEffect(() => {
     if (!dataChannel) return;
 
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       const data = event.data;
 
       // handle metadata ( strings )
@@ -78,6 +78,7 @@ export const useFileTransfer = (
         }
       } else {
         // handle file chunks
+        await new Promise((resolve) => setTimeout(resolve, 5000));
         receivedDataRef.current.push(data);
         receivedSizeRef.current += data.byteLength;
 
