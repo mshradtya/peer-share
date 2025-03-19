@@ -35,7 +35,7 @@ A React application that enables direct peer-to-peer file transfers using WebRTC
 - [ ] Drag and drop file interface
 - [ ] File preview functionality for common formats
 - [ ] Multiple file selection
-- [ ] UI improvements (responsive design, animations)
+- [x] UI improvements (responsive design, animations)
 - [ ] Enhanced connection status indicators
 - [ ] Basic text/clipboard sharing alongside files
 
@@ -46,7 +46,7 @@ A React application that enables direct peer-to-peer file transfers using WebRTC
 - [ ] File compression for compatible types
 - [ ] Simple signaling server for easier connections (optional)
 - [ ] QR code generation for connection strings
-- [ ] Dark/light theme support
+- [x] Dark/light theme support
 
 ### Long Term (Advanced)
 
