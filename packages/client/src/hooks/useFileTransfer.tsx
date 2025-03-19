@@ -45,6 +45,7 @@ export const useFileTransfer = (
   // constants
   const CHUNK_SIZE = 32 * 1024; // 32 KB
   const CHUNK_DELAY = 5; // ms
+  const MAX_BUFFER_SIZE = 16; // 16 mb
 
   // Setup data channel message event handling for file reception
   useEffect(() => {
@@ -170,6 +171,9 @@ export const useFileTransfer = (
 
     const chunk = fileSendQueueRef.current.shift() as Chunk;
 
+    const bufferPercentage =
+      dataChannel.bufferedAmount / (1024 * 1024) / MAX_BUFFER_SIZE;
+
     try {
       dataChannel.send(chunk.data);
 
@@ -181,7 +185,19 @@ export const useFileTransfer = (
 
       // if more chunks to send
       if (fileSendQueueRef.current.length > 0) {
-        setTimeout(processSendQueue, CHUNK_DELAY);
+        if (bufferPercentage > 0.8) {
+          // buffer almost full - even more delay
+          setTimeout(processSendQueue, CHUNK_DELAY * 20);
+        } else if (bufferPercentage > 0.7) {
+          // buffer almost more than half - more delay
+          setTimeout(processSendQueue, CHUNK_DELAY * 10);
+        } else if (bufferPercentage > 0.5) {
+          // buffer almost half - little delay
+          setTimeout(processSendQueue, CHUNK_DELAY * 5);
+        } else {
+          // buffer almost empty - normal delay
+          setTimeout(processSendQueue, CHUNK_DELAY);
+        }
       } else {
         // if this was the last chunk
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
