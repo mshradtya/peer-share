@@ -81,15 +81,26 @@ const FileTransfer: React.FC = () => {
         <div
           className={`border-dashed cursor-pointer rounded-md border-2 ${
             isDragging ? "border-primary bg-primary/5" : "border-zinc-400"
-          } ${
-            file ? "bg-zinc-100 dark:bg-zinc-800 " : ""
           } w-full min-h-20 md:min-h-28 flex flex-col justify-center items-center gap-2 p-3 md:p-4 transition-colors`}
           onClick={handleFileSelect}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {file ? (
+          <Upload className="h-6 w-6 md:h-8 md:w-8 text-zinc-400" />
+          <div className="text-center">
+            <p className="text-sm md:text-base">
+              Drag files here or click to select
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 px-2">
+              Files will be transferred directly to your peer
+            </p>
+          </div>
+        </div>
+
+        {file && (
+          <div className="border rounded-md p-3 md:p-4 mt-2">
+            <h3 className="text-sm font-medium mb-2">Selected file</h3>
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2 md:gap-3 max-w-[calc(100%-40px)]">
                 <File className="h-6 w-6 md:h-8 md:w-8 flex-shrink-0 text-primary" />
@@ -111,26 +122,14 @@ const FileTransfer: React.FC = () => {
                 <X className="h-3 w-3 md:h-4 md:w-4" />
               </Button>
             </div>
-          ) : (
-            <>
-              <Upload className="h-6 w-6 md:h-8 md:w-8 text-zinc-400" />
-              <div className="text-center">
-                <p className="text-sm md:text-base">
-                  Drag files here or click to select
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 px-2">
-                  Files will be transferred directly to your peer
-                </p>
-              </div>
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="flex justify-center items-center mt-1 md:mt-2">
+        <div className="flex justify-center items-center mt-3">
           <Button
-            disabled={!isConnected || !file}
+            disabled={!isConnected}
             onClick={startSendingFile}
-            className="w-full sm:w-auto"
+            className="w-auto"
           >
             Send File
           </Button>
