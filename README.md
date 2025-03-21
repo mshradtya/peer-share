@@ -32,7 +32,7 @@ A React application that enables direct peer-to-peer file transfers using WebRTC
 
 ### Short Term (Easier)
 
-- [ ] Drag and drop file interface
+- [x] Drag and drop file interface
 - [ ] File preview functionality for common formats
 - [ ] Multiple file selection
 - [x] UI improvements (responsive design, animations)
