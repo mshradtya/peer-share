@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useWebRTC } from "@/context/WebRTCProvider";
 
 const FileTransfer: React.FC = () => {
-  const { isConnected, setFile, startSendingFile, file } = useWebRTC();
+  const { isConnected, startSendingFile, files, setFiles } = useWebRTC();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,7 +25,7 @@ const FileTransfer: React.FC = () => {
     if (!files?.length) {
       return;
     }
-    setFile(files[0]);
+    setFiles([...files]);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -43,14 +43,15 @@ const FileTransfer: React.FC = () => {
     setIsDragging(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
+      setFiles([...e.dataTransfer.files]);
     }
   };
 
-  const handleClearFile = (e: React.MouseEvent) => {
+  const handleClearFile = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFile(null);
-    if (fileInputRef.current) {
+    setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+
+    if (files.length === 1 && fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
@@ -76,6 +77,7 @@ const FileTransfer: React.FC = () => {
           ref={fileInputRef}
           className="hidden"
           onChange={handleFileChange}
+          multiple
         />
 
         <div
@@ -98,32 +100,33 @@ const FileTransfer: React.FC = () => {
           </div>
         </div>
 
-        {file && (
-          <div className="border rounded-md p-3 md:p-4 mt-2">
-            <h3 className="text-sm font-medium mb-2">Selected file</h3>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2 md:gap-3 max-w-[calc(100%-40px)]">
-                <File className="h-6 w-6 md:h-8 md:w-8 flex-shrink-0 text-primary" />
-                <div className="overflow-hidden">
-                  <p className="font-medium text-sm md:text-base truncate">
-                    {file.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
-                  </p>
+        {files &&
+          files.map((file, index) => (
+            <div key={index} className="border rounded-md p-3 md:p-4 mt-2">
+              <h3 className="text-sm font-medium mb-2">Selected file</h3>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2 md:gap-3 max-w-[calc(100%-40px)]">
+                  <File className="h-6 w-6 md:h-8 md:w-8 flex-shrink-0 text-primary" />
+                  <div className="overflow-hidden">
+                    <p className="font-medium text-sm md:text-base truncate">
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(file.size)}
+                    </p>
+                  </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 md:h-8 md:w-8 rounded-full flex-shrink-0"
+                  onClick={(e) => handleClearFile(index, e)}
+                >
+                  <X className="h-3 w-3 md:h-4 md:w-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 md:h-8 md:w-8 rounded-full flex-shrink-0"
-                onClick={handleClearFile}
-              >
-                <X className="h-3 w-3 md:h-4 md:w-4" />
-              </Button>
             </div>
-          </div>
-        )}
+          ))}
 
         <div className="flex justify-center items-center mt-3">
           <Button
