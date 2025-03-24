@@ -11,14 +11,14 @@ export interface FileMetaData {
 }
 
 export interface FileTransferState {
-  file: File | null;
+  files: File[];
   showProgress: boolean;
   progress: number;
   transferStatus: string;
   receivedFileUrl: string | null;
   currentFileMetadata: FileMetaData;
 
-  setFile: React.Dispatch<React.SetStateAction<File | null>>;
+  setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   startSendingFile: () => void;
   handleDownload: () => void;
 }
@@ -26,7 +26,7 @@ export interface FileTransferState {
 export const useFileTransfer = (
   dataChannel: RTCDataChannel | null
 ): FileTransferState => {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [showProgress, setShowProgress] = useState(false);
   const [progress, setProgress] = useState(0);
   const [transferStatus, setTransferStatus] = useState("");
@@ -110,14 +110,14 @@ export const useFileTransfer = (
   }, [dataChannel, currentFileMetadata.type]);
 
   const prepareFileChunks = useCallback(() => {
-    if (!file) return;
+    if (files.length === 0) return;
 
     fileReaderRef.current = new FileReader();
     let offset = 0;
     let chunkIndex = 0;
 
     const readSlice = (o: number) => {
-      const slice = file.slice(o, o + CHUNK_SIZE);
+      const slice = files[0].slice(o, o + CHUNK_SIZE);
       fileReaderRef.current?.readAsArrayBuffer(slice);
     };
 
@@ -134,11 +134,11 @@ export const useFileTransfer = (
       offset += chunk.byteLength;
       chunkIndex++;
 
-      const percentage = Math.floor((offset / file.size) * 100);
+      const percentage = Math.floor((offset / files[0].size) * 100);
       setProgress(percentage);
       setTransferStatus(`Preparing file for Transfer... ${percentage}%`);
 
-      if (offset < file.size) {
+      if (offset < files[0].size) {
         readSlice(offset);
       } else {
         processSendQueue();
@@ -163,11 +163,11 @@ export const useFileTransfer = (
         fileReaderRef.current.removeEventListener("error", handleError);
       }
     };
-  }, [file]);
+  }, [files]);
 
   const processSendQueue = useCallback(() => {
     if (fileSendQueueRef.current.length === 0) return;
-    if (!dataChannel || !file) return;
+    if (!dataChannel || files.length === 0) return;
 
     const chunk = fileSendQueueRef.current.shift() as Chunk;
 
@@ -178,7 +178,7 @@ export const useFileTransfer = (
       dataChannel.send(chunk.data);
 
       const sentBytes = chunk.index * CHUNK_SIZE;
-      const percentage = Math.floor((sentBytes / file.size) * 100);
+      const percentage = Math.floor((sentBytes / files[0].size) * 100);
 
       setProgress(percentage);
       setTransferStatus(`Sending File... ${percentage}%`);
@@ -200,7 +200,7 @@ export const useFileTransfer = (
         }
       } else {
         // if this was the last chunk
-        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        const totalChunks = Math.ceil(files[0].size / CHUNK_SIZE);
 
         if (chunk.index >= totalChunks - 1) {
           // Transfer complete
@@ -214,15 +214,20 @@ export const useFileTransfer = (
     } catch (err) {
       console.log(err);
     }
-  }, [dataChannel, file]);
+  }, [dataChannel, files]);
 
   const startSendingFile = useCallback(() => {
-    if (!file || !dataChannel || dataChannel.readyState !== "open") {
+    if (
+      files.length === 0 ||
+      !dataChannel ||
+      dataChannel.readyState !== "open"
+    ) {
       return;
     }
 
     // reset queue
     fileSendQueueRef.current = [];
+    let file = files[0];
 
     // send file metadata first
     const metadata = {
@@ -235,7 +240,7 @@ export const useFileTransfer = (
     dataChannel.send(JSON.stringify(metadata));
     setShowProgress(true);
     prepareFileChunks();
-  }, [file, dataChannel, prepareFileChunks]);
+  }, [files, dataChannel, prepareFileChunks]);
 
   const handleDownload = useCallback(() => {
     if (!receivedFileUrl || !currentFileMetadata.name) return;
@@ -249,13 +254,13 @@ export const useFileTransfer = (
   }, [receivedFileUrl, currentFileMetadata.name]);
 
   return {
-    file,
+    files,
     showProgress,
     progress,
     transferStatus,
     receivedFileUrl,
     currentFileMetadata,
-    setFile,
+    setFiles,
     startSendingFile,
     handleDownload,
   };
