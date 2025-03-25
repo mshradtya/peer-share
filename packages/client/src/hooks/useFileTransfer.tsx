@@ -10,31 +10,42 @@ export interface FileMetaData {
   type: string;
 }
 
+export interface ReceivedFile {
+  name: string;
+  url: string;
+}
+
 export interface FileTransferState {
   files: File[];
   showProgress: boolean;
   progress: number;
   transferStatus: string;
-  receivedFileUrl: string | null;
   currentFileMetadata: FileMetaData;
+  receivedFiles: ReceivedFile[];
 
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   startSendingFile: () => void;
-  handleDownload: () => void;
+  handleDownload: (name: string, url: string) => void;
 }
 
 export const useFileTransfer = (
   dataChannel: RTCDataChannel | null
 ): FileTransferState => {
+  // sender side
   const [files, setFiles] = useState<File[]>([]);
-  const [showProgress, setShowProgress] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [transferStatus, setTransferStatus] = useState("");
-  const [receivedFileUrl, setReceivedFileUrl] = useState<string | null>(null);
+  const [currentFileIndex, setCurrentFileIndex] = useState<number>(0);
+
+  // receiver side
+  const [receivedFiles, setReceivedFiles] = useState<ReceivedFile[]>([]);
   const [currentFileMetadata, setCurrentFileMetadata] = useState<FileMetaData>({
     name: "",
     type: "",
   });
+
+  // both sides states
+  const [showProgress, setShowProgress] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [transferStatus, setTransferStatus] = useState("");
 
   const fileReaderRef = useRef<FileReader | null>(null);
   const fileSendQueueRef = useRef<Chunk[]>([]);
@@ -46,6 +57,15 @@ export const useFileTransfer = (
   const CHUNK_SIZE = 32 * 1024; // 32 KB
   const CHUNK_DELAY = 5; // ms
   const MAX_BUFFER_SIZE = 16; // 16 mb
+
+  useEffect(() => {
+    if (currentFileIndex >= files.length) {
+      setFiles([]);
+      setCurrentFileIndex(0);
+    } else {
+      startSendingFile();
+    }
+  }, [currentFileIndex]);
 
   // Setup data channel message event handling for file reception
   useEffect(() => {
@@ -72,7 +92,10 @@ export const useFileTransfer = (
             });
 
             // enable progress bar
-            setShowProgress(true);
+            // setShowProgress(true);
+            setTimeout(() => {
+              setShowProgress(true);
+            }, 1000);
           }
         } catch (err) {
           console.log("Error parsing message:", err);
@@ -87,7 +110,9 @@ export const useFileTransfer = (
         );
 
         setProgress(percentage);
-        setTransferStatus(`Receiving file... ${percentage}%`);
+        setTransferStatus(
+          `Receiving file - ${currentFileMetadata.name}... ${percentage}%`
+        );
 
         // if transfer is complete
         if (receivedSizeRef.current === currentFileSizeRef.current) {
@@ -96,8 +121,13 @@ export const useFileTransfer = (
           });
 
           const fileUrl = URL.createObjectURL(receivedFile);
-          setReceivedFileUrl(fileUrl);
-          setTimeout(() => setShowProgress(false), 2000);
+
+          setReceivedFiles((prev) => [
+            ...prev,
+            { name: currentFileMetadata.name, url: fileUrl },
+          ]);
+          // setTimeout(() => setShowProgress(false), 2000);
+          setShowProgress(false);
         }
       }
     };
@@ -107,17 +137,18 @@ export const useFileTransfer = (
     return () => {
       dataChannel.removeEventListener("message", handleMessage);
     };
-  }, [dataChannel, currentFileMetadata.type]);
+  }, [dataChannel, currentFileMetadata]);
 
   const prepareFileChunks = useCallback(() => {
     if (files.length === 0) return;
+    const currentFile = files[currentFileIndex];
 
     fileReaderRef.current = new FileReader();
     let offset = 0;
     let chunkIndex = 0;
 
     const readSlice = (o: number) => {
-      const slice = files[0].slice(o, o + CHUNK_SIZE);
+      const slice = currentFile.slice(o, o + CHUNK_SIZE);
       fileReaderRef.current?.readAsArrayBuffer(slice);
     };
 
@@ -134,11 +165,13 @@ export const useFileTransfer = (
       offset += chunk.byteLength;
       chunkIndex++;
 
-      const percentage = Math.floor((offset / files[0].size) * 100);
+      const percentage = Math.floor((offset / currentFile.size) * 100);
       setProgress(percentage);
-      setTransferStatus(`Preparing file for Transfer... ${percentage}%`);
+      setTransferStatus(
+        `Preparing file - ${currentFile.name} for Transfer... ${percentage}%`
+      );
 
-      if (offset < files[0].size) {
+      if (offset < currentFile.size) {
         readSlice(offset);
       } else {
         processSendQueue();
@@ -163,11 +196,12 @@ export const useFileTransfer = (
         fileReaderRef.current.removeEventListener("error", handleError);
       }
     };
-  }, [files]);
+  }, [files, currentFileIndex]);
 
   const processSendQueue = useCallback(() => {
     if (fileSendQueueRef.current.length === 0) return;
     if (!dataChannel || files.length === 0) return;
+    const currentFile = files[currentFileIndex];
 
     const chunk = fileSendQueueRef.current.shift() as Chunk;
 
@@ -178,35 +212,35 @@ export const useFileTransfer = (
       dataChannel.send(chunk.data);
 
       const sentBytes = chunk.index * CHUNK_SIZE;
-      const percentage = Math.floor((sentBytes / files[0].size) * 100);
+      const percentage = Math.floor((sentBytes / currentFile.size) * 100);
 
       setProgress(percentage);
-      setTransferStatus(`Sending File... ${percentage}%`);
+      setTransferStatus(`Sending File - ${currentFile.name}... ${percentage}%`);
 
       // if more chunks to send
       if (fileSendQueueRef.current.length > 0) {
+        // adding delay based on how much buffer is filled
         if (bufferPercentage > 0.8) {
-          // buffer almost full - even more delay
           setTimeout(processSendQueue, CHUNK_DELAY * 20);
         } else if (bufferPercentage > 0.7) {
-          // buffer almost more than half - more delay
           setTimeout(processSendQueue, CHUNK_DELAY * 10);
         } else if (bufferPercentage > 0.5) {
-          // buffer almost half - little delay
           setTimeout(processSendQueue, CHUNK_DELAY * 5);
         } else {
-          // buffer almost empty - normal delay
           setTimeout(processSendQueue, CHUNK_DELAY);
         }
       } else {
         // if this was the last chunk
-        const totalChunks = Math.ceil(files[0].size / CHUNK_SIZE);
+        const totalChunks = Math.ceil(currentFile.size / CHUNK_SIZE);
 
         if (chunk.index >= totalChunks - 1) {
           // Transfer complete
           setProgress(100);
           setTransferStatus(`Sending File... 100%`);
-          setTimeout(() => setShowProgress(false), 2000);
+          setTimeout(() => {
+            setShowProgress(false);
+            setCurrentFileIndex((prev) => prev + 1);
+          }, 2000);
         } else {
           console.log("Warning: not all chunks were processed");
         }
@@ -214,11 +248,12 @@ export const useFileTransfer = (
     } catch (err) {
       console.log(err);
     }
-  }, [dataChannel, files]);
+  }, [dataChannel, currentFileIndex, files]);
 
   const startSendingFile = useCallback(() => {
     if (
       files.length === 0 ||
+      currentFileIndex >= files.length ||
       !dataChannel ||
       dataChannel.readyState !== "open"
     ) {
@@ -227,39 +262,42 @@ export const useFileTransfer = (
 
     // reset queue
     fileSendQueueRef.current = [];
-    let file = files[0];
+    let currentFile = files[currentFileIndex];
 
     // send file metadata first
     const metadata = {
       type: "file-info",
-      name: file.name,
-      size: file.size,
-      mimeType: file.type,
+      name: currentFile.name,
+      size: currentFile.size,
+      mimeType: currentFile.type,
     };
+
+    console.log(metadata);
 
     dataChannel.send(JSON.stringify(metadata));
     setShowProgress(true);
     prepareFileChunks();
-  }, [files, dataChannel, prepareFileChunks]);
+  }, [files, currentFileIndex, dataChannel, prepareFileChunks]);
 
-  const handleDownload = useCallback(() => {
-    if (!receivedFileUrl || !currentFileMetadata.name) return;
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = receivedFileUrl;
-    downloadLink.download = currentFileMetadata.name;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-  }, [receivedFileUrl, currentFileMetadata.name]);
+  const handleDownload = useCallback(
+    (name: string, url: string) => {
+      const downloadLink = document.createElement("a");
+      downloadLink.href = url;
+      downloadLink.download = name;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    },
+    [receivedFiles]
+  );
 
   return {
     files,
     showProgress,
     progress,
     transferStatus,
-    receivedFileUrl,
     currentFileMetadata,
+    receivedFiles,
     setFiles,
     startSendingFile,
     handleDownload,
