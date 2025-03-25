@@ -10,32 +10,42 @@ export interface FileMetaData {
   type: string;
 }
 
+export interface ReceivedFile {
+  name: string;
+  url: string;
+}
+
 export interface FileTransferState {
   files: File[];
   showProgress: boolean;
   progress: number;
   transferStatus: string;
-  receivedFileUrl: string | null;
   currentFileMetadata: FileMetaData;
+  receivedFiles: ReceivedFile[];
 
   setFiles: React.Dispatch<React.SetStateAction<File[]>>;
   startSendingFile: () => void;
-  handleDownload: () => void;
+  handleDownload: (name: string, url: string) => void;
 }
 
 export const useFileTransfer = (
   dataChannel: RTCDataChannel | null
 ): FileTransferState => {
+  // sender side
   const [files, setFiles] = useState<File[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState<number>(0);
-  const [showProgress, setShowProgress] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [transferStatus, setTransferStatus] = useState("");
-  const [receivedFileUrl, setReceivedFileUrl] = useState<string | null>(null);
+
+  // receiver side
+  const [receivedFiles, setReceivedFiles] = useState<ReceivedFile[]>([]);
   const [currentFileMetadata, setCurrentFileMetadata] = useState<FileMetaData>({
     name: "",
     type: "",
   });
+
+  // both sides states
+  const [showProgress, setShowProgress] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [transferStatus, setTransferStatus] = useState("");
 
   const fileReaderRef = useRef<FileReader | null>(null);
   const fileSendQueueRef = useRef<Chunk[]>([]);
@@ -51,6 +61,7 @@ export const useFileTransfer = (
   useEffect(() => {
     if (currentFileIndex >= files.length) {
       setFiles([]);
+      setCurrentFileIndex(0);
     } else {
       startSendingFile();
     }
@@ -81,7 +92,10 @@ export const useFileTransfer = (
             });
 
             // enable progress bar
-            setShowProgress(true);
+            // setShowProgress(true);
+            setTimeout(() => {
+              setShowProgress(true);
+            }, 1000);
           }
         } catch (err) {
           console.log("Error parsing message:", err);
@@ -107,8 +121,13 @@ export const useFileTransfer = (
           });
 
           const fileUrl = URL.createObjectURL(receivedFile);
-          setReceivedFileUrl(fileUrl);
-          setTimeout(() => setShowProgress(false), 2000);
+
+          setReceivedFiles((prev) => [
+            ...prev,
+            { name: currentFileMetadata.name, url: fileUrl },
+          ]);
+          // setTimeout(() => setShowProgress(false), 2000);
+          setShowProgress(false);
         }
       }
     };
@@ -118,7 +137,7 @@ export const useFileTransfer = (
     return () => {
       dataChannel.removeEventListener("message", handleMessage);
     };
-  }, [dataChannel, currentFileMetadata.type]);
+  }, [dataChannel, currentFileMetadata]);
 
   const prepareFileChunks = useCallback(() => {
     if (files.length === 0) return;
@@ -260,24 +279,25 @@ export const useFileTransfer = (
     prepareFileChunks();
   }, [files, currentFileIndex, dataChannel, prepareFileChunks]);
 
-  const handleDownload = useCallback(() => {
-    if (!receivedFileUrl || !currentFileMetadata.name) return;
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = receivedFileUrl;
-    downloadLink.download = currentFileMetadata.name;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-  }, [receivedFileUrl, currentFileMetadata.name]);
+  const handleDownload = useCallback(
+    (name: string, url: string) => {
+      const downloadLink = document.createElement("a");
+      downloadLink.href = url;
+      downloadLink.download = name;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    },
+    [receivedFiles]
+  );
 
   return {
     files,
     showProgress,
     progress,
     transferStatus,
-    receivedFileUrl,
     currentFileMetadata,
+    receivedFiles,
     setFiles,
     startSendingFile,
     handleDownload,
